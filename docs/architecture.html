@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture -- terraform-aws-bedrock-agents</title>
+<style>
+  :root{--ink:#0b0c0b;--accent:#c8420a;--surface:#131413;--border:#2a2b2a;--text:#d4d4d4;--text-dim:#888;--card:#181918;--success:#2ea043;--warn:#d29922;--info:#388bfd}
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"SF Mono","Cascadia Code","Fira Code",monospace;background:var(--ink);color:var(--text);line-height:1.65;padding:0}
+  a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+  .container{max-width:1140px;margin:0 auto;padding:2rem 1.5rem}
+  header{border-bottom:2px solid var(--accent);padding:2.5rem 0 1.5rem;margin-bottom:2.5rem}
+  header h1{font-size:1.6rem;color:#fff;margin-bottom:.35rem}
+  header p.subtitle{color:var(--text-dim);font-size:.85rem}
+  .badge{display:inline-block;font-size:.7rem;padding:.15rem .55rem;border-radius:3px;margin-right:.4rem;margin-bottom:.3rem;border:1px solid var(--border);color:var(--text-dim)}
+  .badge--accent{border-color:var(--accent);color:var(--accent)}
+  h2{font-size:1.15rem;color:var(--accent);margin:2.5rem 0 1rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+  h3{font-size:.95rem;color:#fff;margin:1.5rem 0 .6rem}
+  p,li{font-size:.82rem}
+  ul,ol{padding-left:1.4rem;margin-bottom:1rem}li{margin-bottom:.3rem}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem}
+  .card h4{font-size:.8rem;color:var(--accent);margin-bottom:.4rem}
+  .card p{font-size:.75rem;color:var(--text-dim)}
+  .card .val{font-size:1.3rem;color:#fff;font-weight:700;margin:.3rem 0}
+  .arch-diagram{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.5rem;overflow-x:auto;margin:1rem 0 1.5rem}
+  .flow-row{display:flex;align-items:center;gap:.5rem;justify-content:center;margin-bottom:.5rem;flex-wrap:wrap}
+  .box{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:.55rem .9rem;font-size:.72rem;text-align:center;min-width:90px;color:var(--text)}
+  .box.accent{border-color:var(--accent);color:var(--accent)}
+  .arrow{color:var(--accent);font-size:.9rem;flex-shrink:0}
+  table{width:100%;border-collapse:collapse;font-size:.75rem;margin:1rem 0}
+  th,td{border:1px solid var(--border);padding:.45rem .6rem;text-align:left}
+  th{background:var(--surface);color:var(--accent);font-weight:600}
+  tr:nth-child(even){background:var(--surface)}
+  .checklist{list-style:none;padding-left:0}
+  .checklist li{padding:.35rem 0;font-size:.78rem;border-bottom:1px solid var(--border)}
+  .checklist li::before{content:"[ ] ";color:var(--accent);font-weight:700}
+  .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+  @media(max-width:700px){.section-grid{grid-template-columns:1fr}}
+  .code-block{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1rem;font-size:.73rem;overflow-x:auto;margin:.8rem 0;white-space:pre}
+  footer{border-top:1px solid var(--border);margin-top:3rem;padding:1.5rem 0;text-align:center;font-size:.7rem;color:var(--text-dim)}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>terraform-aws-bedrock-agents</h1>
+  <p class="subtitle">Architecture Reference -- Autonomous AI Agents with Knowledge Bases and Action Groups</p>
+  <div style="margin-top:.7rem">
+    <span class="badge badge--accent">Terraform</span>
+    <span class="badge badge--accent">AWS</span>
+    <span class="badge">Bedrock Agent</span>
+    <span class="badge">Knowledge Base</span>
+    <span class="badge">OpenSearch Serverless</span>
+    <span class="badge">Lambda</span>
+    <span class="badge">S3</span>
+  </div>
+</header>
+
+<!-- ─── Executive Summary ─── -->
+<h2>Executive Summary</h2>
+<p>This module provisions AWS Bedrock Agents -- autonomous AI agents that execute multi-step tasks using foundation models, knowledge bases, and custom action groups. It creates a Bedrock Agent backed by a configurable foundation model (default: Claude 3 Sonnet), a Knowledge Base with OpenSearch Serverless vector store for RAG (Retrieval-Augmented Generation), S3-based document storage, Lambda-powered action groups for API integrations, and all required IAM roles with least-privilege policies. The agent is exposed via an alias for stable versioned invocations.</p>
+
+<!-- ─── Overview Cards ─── -->
+<h2>Overview</h2>
+<div class="cards">
+  <div class="card"><h4>AWS Resources</h4><div class="val">12+</div><p>Bedrock Agent, Knowledge Base, Data Source, OpenSearch Serverless Collection, S3 Bucket, Lambda Functions, IAM Roles, Agent Alias, Security/Network/Access Policies</p></div>
+  <div class="card"><h4>Required Variables</h4><div class="val">4</div><p>agent_name, instruction, knowledge_base_name, s3_bucket_name</p></div>
+  <div class="card"><h4>Outputs</h4><div class="val">11</div><p>Agent ID/ARN, alias, knowledge base, action groups, S3, OpenSearch, IAM roles</p></div>
+  <div class="card"><h4>Foundation Model</h4><div class="val">Claude 3</div><p>Default: anthropic.claude-3-sonnet-20240229-v1:0 (configurable)</p></div>
+</div>
+
+<!-- ─── Architecture Diagram ─── -->
+<h2>Architecture Diagram</h2>
+<div class="arch-diagram">
+  <div class="flow-row">
+    <div class="box">Client Application / SDK</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box accent">Agent Alias</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box accent">Bedrock Agent (Foundation Model)</div>
+  </div>
+  <div class="flow-row">
+    <div class="box accent">Bedrock Agent</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box">Knowledge Base</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box">Embedding Model (Titan v2)</div>
+  </div>
+  <div class="flow-row">
+    <div class="box">Knowledge Base</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box accent">OpenSearch Serverless</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box">Vector Index</div>
+  </div>
+  <div class="flow-row">
+    <div class="box">Knowledge Base</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box">S3 Data Source</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box accent">S3 Bucket (Documents)</div>
+  </div>
+  <div class="flow-row">
+    <div class="box accent">Bedrock Agent</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box">Action Group 1..N</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box accent">Lambda Function 1..N</div>
+  </div>
+  <div class="flow-row">
+    <div class="box" style="border-style:dashed">Agent Role (IRSA)</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box accent">Bedrock Agent</div>
+    <div class="arrow">&amp;</div>
+    <div class="box" style="border-style:dashed">KB Role</div>
+    <div class="arrow">&#8594;</div>
+    <div class="box">Knowledge Base</div>
+  </div>
+</div>
+
+<!-- ─── Component Breakdown ─── -->
+<h2>Component Breakdown</h2>
+<div class="section-grid">
+  <div>
+    <h3>Bedrock Agent</h3>
+    <ul>
+      <li><strong>Agent</strong> -- Orchestrates reasoning with foundation model, instruction prompt, and tools</li>
+      <li><strong>Agent Alias</strong> -- Stable endpoint ("live") for production invocations</li>
+      <li><strong>Foundation Model</strong> -- Claude 3 Sonnet (configurable); supports streaming</li>
+      <li><strong>Instruction</strong> -- System prompt defining agent behavior and capabilities</li>
+    </ul>
+    <h3>Knowledge Base (RAG)</h3>
+    <ul>
+      <li><strong>Knowledge Base</strong> -- VECTOR type with embedding model (Titan Embed Text v2)</li>
+      <li><strong>S3 Data Source</strong> -- Documents stored in versioned, encrypted S3 bucket</li>
+      <li><strong>OpenSearch Serverless</strong> -- VECTORSEARCH collection with encryption, network, and data access policies</li>
+      <li><strong>Vector Index</strong> -- Configurable field mapping (embedding, text, metadata)</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Action Groups</h3>
+    <ul>
+      <li><strong>Lambda Functions</strong> -- Per-action-group functions with configurable runtime, handler, timeout, memory</li>
+      <li><strong>API Schema</strong> -- OpenAPI spec via inline payload or S3-hosted schema</li>
+      <li><strong>Bedrock Permission</strong> -- Lambda resource policy allowing bedrock.amazonaws.com invocation</li>
+    </ul>
+    <h3>IAM Roles</h3>
+    <ul>
+      <li><strong>Agent Role</strong> -- InvokeModel on foundation model + Retrieve/RetrieveAndGenerate on KB</li>
+      <li><strong>KB Role</strong> -- InvokeModel on embedding model + S3 read + OpenSearch APIAccessAll</li>
+      <li><strong>Lambda Roles</strong> -- Per-action-group with AWSLambdaBasicExecutionRole</li>
+    </ul>
+    <h3>Storage</h3>
+    <ul>
+      <li><strong>S3 Bucket</strong> -- Versioned, KMS-encrypted, public access fully blocked</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ─── Data Flow ─── -->
+<h2>Data Flow</h2>
+<ol>
+  <li>Client application invokes the agent via the Agent Alias using the Bedrock Runtime SDK</li>
+  <li>Agent receives the user prompt and applies the instruction context</li>
+  <li>Agent reasons with the foundation model (Claude 3 Sonnet) to determine the next action</li>
+  <li>If knowledge is needed, agent calls Retrieve/RetrieveAndGenerate on the Knowledge Base</li>
+  <li>Knowledge Base embeds the query using Titan Embed Text v2 and searches the OpenSearch Serverless vector index</li>
+  <li>Matching document chunks are returned to the agent for grounded responses</li>
+  <li>If an API action is needed, agent invokes the appropriate action group Lambda with structured parameters</li>
+  <li>Lambda executes the action (e.g., order lookup, data retrieval) and returns results to the agent</li>
+  <li>Agent synthesizes all information and returns a final response to the client</li>
+</ol>
+
+<!-- ─── Security Controls ─── -->
+<h2>Security Controls</h2>
+<table>
+  <tr><th>Control</th><th>Implementation</th></tr>
+  <tr><td>Model Access Scoping</td><td>Agent role limited to specific foundation model ARN only</td></tr>
+  <tr><td>Source Account Condition</td><td>Agent and KB assume-role policies use aws:SourceAccount condition</td></tr>
+  <tr><td>S3 Encryption</td><td>SSE-KMS with bucket key enabled; public access fully blocked</td></tr>
+  <tr><td>OpenSearch Security</td><td>Encryption policy (AWS-owned key), network policy, data access policy scoped to KB role + root</td></tr>
+  <tr><td>Lambda Isolation</td><td>Per-action-group IAM roles; resource-based policy scoped to agent ARN</td></tr>
+  <tr><td>Least Privilege</td><td>Separate roles for agent, knowledge base, and each Lambda function</td></tr>
+  <tr><td>S3 Versioning</td><td>Document versioning enabled for auditability and recovery</td></tr>
+</table>
+
+<!-- ─── Industry Adaptation ─── -->
+<h2>Industry Adaptation</h2>
+<div class="section-grid">
+  <div>
+    <h3>Customer Support</h3>
+    <p>Load support documentation into the S3 knowledge base. Create action groups for order lookup, ticket creation, and account management. The agent provides grounded answers from docs and executes actions via Lambda.</p>
+  </div>
+  <div>
+    <h3>Internal Knowledge Assistant</h3>
+    <p>Ingest company wikis, runbooks, and policies into S3. The agent answers questions using RAG against the knowledge base. No action groups needed for pure Q&A use cases.</p>
+  </div>
+  <div>
+    <h3>Data Processing Pipelines</h3>
+    <p>Define action groups for data transformation, validation, and enrichment. The agent orchestrates multi-step data workflows by chaining Lambda invocations based on natural language instructions.</p>
+  </div>
+  <div>
+    <h3>Healthcare / Regulated</h3>
+    <p>Use customer-managed KMS keys for all encryption. Restrict OpenSearch network policy to VPC endpoints. Enable S3 access logging. Ensure compliance with data residency requirements via region selection.</p>
+  </div>
+</div>
+
+<!-- ─── Production Readiness Checklist ─── -->
+<h2>Production Readiness Checklist</h2>
+<ul class="checklist">
+  <li>Enable foundation model access in Bedrock console (Claude 3 Sonnet)</li>
+  <li>Enable embedding model access in Bedrock console (Titan Embed Text v2)</li>
+  <li>Upload documents to the S3 knowledge base bucket</li>
+  <li>Trigger knowledge base sync: <code>aws bedrock-agent start-ingestion-job</code></li>
+  <li>Test agent via Bedrock console Test pane or SDK</li>
+  <li>Verify Lambda action groups execute correctly</li>
+  <li>Review OpenSearch Serverless collection metrics</li>
+  <li>Set up monitoring/alerting on Lambda errors and agent invocation failures</li>
+  <li>Configure remote Terraform state backend (S3 + DynamoDB)</li>
+  <li>Tag all resources with Environment, Team, ManagedBy</li>
+</ul>
+
+<!-- ─── Config Reference ─── -->
+<h2>Configuration Reference</h2>
+<h3>Inputs</h3>
+<table>
+  <tr><th>Name</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+  <tr><td>agent_name</td><td>string</td><td>--</td><td>yes</td><td>Name of the Bedrock Agent</td></tr>
+  <tr><td>foundation_model</td><td>string</td><td>anthropic.claude-3-sonnet-20240229-v1:0</td><td>no</td><td>Foundation model identifier</td></tr>
+  <tr><td>instruction</td><td>string</td><td>--</td><td>yes</td><td>System prompt for agent behavior</td></tr>
+  <tr><td>idle_session_ttl</td><td>number</td><td>600</td><td>no</td><td>Session idle timeout (seconds)</td></tr>
+  <tr><td>knowledge_base_name</td><td>string</td><td>--</td><td>yes</td><td>Name of the knowledge base</td></tr>
+  <tr><td>s3_bucket_name</td><td>string</td><td>--</td><td>yes</td><td>S3 bucket for knowledge base documents</td></tr>
+  <tr><td>embedding_model</td><td>string</td><td>amazon.titan-embed-text-v2:0</td><td>no</td><td>Embedding model for vector store</td></tr>
+  <tr><td>vector_store_type</td><td>string</td><td>OPENSEARCH_SERVERLESS</td><td>no</td><td>Vector store type</td></tr>
+  <tr><td>action_groups</td><td>list(object)</td><td>[]</td><td>no</td><td>Action group configurations</td></tr>
+  <tr><td>agent_description</td><td>string</td><td>""</td><td>no</td><td>Agent description</td></tr>
+  <tr><td>prepare_agent</td><td>bool</td><td>true</td><td>no</td><td>Prepare agent after creation</td></tr>
+  <tr><td>knowledge_base_description</td><td>string</td><td>Knowledge base for Bedrock Agent</td><td>no</td><td>KB description</td></tr>
+  <tr><td>s3_data_source_prefix</td><td>string</td><td>""</td><td>no</td><td>S3 key prefix filter</td></tr>
+  <tr><td>opensearch_collection_name</td><td>string</td><td>""</td><td>no</td><td>OpenSearch collection name (auto-generated if empty)</td></tr>
+  <tr><td>vector_index_name</td><td>string</td><td>bedrock-knowledge-base-index</td><td>no</td><td>Vector index name</td></tr>
+  <tr><td>vector_field_name</td><td>string</td><td>embedding</td><td>no</td><td>Vector field in index</td></tr>
+  <tr><td>text_field</td><td>string</td><td>text</td><td>no</td><td>Text field in index</td></tr>
+  <tr><td>metadata_field</td><td>string</td><td>metadata</td><td>no</td><td>Metadata field in index</td></tr>
+  <tr><td>tags</td><td>map(string)</td><td>{}</td><td>no</td><td>Tags for all resources</td></tr>
+</table>
+
+<h3>Outputs</h3>
+<table>
+  <tr><th>Name</th><th>Description</th></tr>
+  <tr><td>agent_id</td><td>Unique identifier of the Bedrock Agent</td></tr>
+  <tr><td>agent_arn</td><td>ARN of the Bedrock Agent</td></tr>
+  <tr><td>agent_alias_id</td><td>Unique identifier of the agent alias</td></tr>
+  <tr><td>knowledge_base_id</td><td>Unique identifier of the knowledge base</td></tr>
+  <tr><td>knowledge_base_arn</td><td>ARN of the knowledge base</td></tr>
+  <tr><td>action_group_ids</td><td>Map of action group names to IDs</td></tr>
+  <tr><td>s3_bucket_arn</td><td>ARN of the S3 knowledge base bucket</td></tr>
+  <tr><td>opensearch_collection_arn</td><td>ARN of the OpenSearch Serverless collection</td></tr>
+  <tr><td>opensearch_collection_endpoint</td><td>Endpoint of the OpenSearch collection</td></tr>
+  <tr><td>agent_role_arn</td><td>ARN of the agent IAM role</td></tr>
+  <tr><td>knowledge_base_role_arn</td><td>ARN of the KB IAM role</td></tr>
+</table>
+
+<!-- ─── Deployment ─── -->
+<h2>Deployment</h2>
+<div class="code-block">terraform init
+terraform plan -out=tfplan
+terraform apply tfplan
+
+# Upload documents to S3
+aws s3 cp ./docs/ s3://&lt;bucket-name&gt;/ --recursive
+
+# Sync knowledge base
+aws bedrock-agent start-ingestion-job \
+  --knowledge-base-id &lt;kb_id&gt; \
+  --data-source-id &lt;ds_id&gt;
+
+# Test agent
+aws bedrock-agent-runtime invoke-agent \
+  --agent-id &lt;agent_id&gt; \
+  --agent-alias-id &lt;alias_id&gt; \
+  --session-id "test-001" \
+  --input-text "Hello, what can you help me with?"</div>
+
+<!-- ─── Links ─── -->
+<h2>Links</h2>
+<ul>
+  <li><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html">Amazon Bedrock Agents User Guide</a></li>
+  <li><a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/bedrockagent_agent">Terraform aws_bedrockagent_agent</a></li>
+  <li><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html">Amazon Bedrock Knowledge Bases</a></li>
+  <li><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-regions.html">Bedrock Regional Availability</a></li>
+</ul>
+
+<footer>
+  terraform-aws-bedrock-agents &middot; Architecture Reference &middot; Generated 2026-03-15 &middot; MIT License
+</footer>
+
+</div>
+</body>
+</html>
