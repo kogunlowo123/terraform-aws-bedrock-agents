@@ -2,13 +2,6 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 data "aws_partition" "current" {}
 
-locals {
-  account_id               = data.aws_caller_identity.current.account_id
-  region                   = data.aws_region.current.name
-  partition                = data.aws_partition.current.partition
-  opensearch_collection_name = var.opensearch_collection_name != "" ? var.opensearch_collection_name : "${var.agent_name}-vectors"
-}
-
 # ------------------------------------------------------------------------------
 # IAM Role for Bedrock Agent
 # ------------------------------------------------------------------------------
@@ -26,7 +19,7 @@ resource "aws_iam_role" "bedrock_agent" {
         Action = "sts:AssumeRole"
         Condition = {
           StringEquals = {
-            "aws:SourceAccount" = local.account_id
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
           }
         }
       }
@@ -49,7 +42,7 @@ resource "aws_iam_role_policy" "bedrock_agent_model" {
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream"
         ]
-        Resource = "arn:${local.partition}:bedrock:${local.region}::foundation-model/${var.foundation_model}"
+        Resource = "arn:${data.aws_partition.current.partition}:bedrock:${data.aws_region.current.name}::foundation-model/${var.foundation_model}"
       }
     ]
   })
@@ -91,7 +84,7 @@ resource "aws_iam_role" "knowledge_base" {
         Action = "sts:AssumeRole"
         Condition = {
           StringEquals = {
-            "aws:SourceAccount" = local.account_id
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
           }
         }
       }
@@ -113,7 +106,7 @@ resource "aws_iam_role_policy" "knowledge_base_model" {
         Action = [
           "bedrock:InvokeModel"
         ]
-        Resource = "arn:${local.partition}:bedrock:${local.region}::foundation-model/${var.embedding_model}"
+        Resource = "arn:${data.aws_partition.current.partition}:bedrock:${data.aws_region.current.name}::foundation-model/${var.embedding_model}"
       }
     ]
   })
@@ -203,14 +196,14 @@ resource "aws_s3_bucket_public_access_block" "knowledge_base" {
 # OpenSearch Serverless Collection for Vector Store
 # ------------------------------------------------------------------------------
 resource "aws_opensearchserverless_security_policy" "encryption" {
-  name = "${local.opensearch_collection_name}-enc"
+  name = "${coalesce(var.opensearch_collection_name, "${var.agent_name}-vectors")}-enc"
   type = "encryption"
 
   policy = jsonencode({
     Rules = [
       {
         ResourceType = "collection"
-        Resource     = ["collection/${local.opensearch_collection_name}"]
+        Resource     = ["collection/${coalesce(var.opensearch_collection_name, "${var.agent_name}-vectors")}"]
       }
     ]
     AWSOwnedKey = true
@@ -218,7 +211,7 @@ resource "aws_opensearchserverless_security_policy" "encryption" {
 }
 
 resource "aws_opensearchserverless_security_policy" "network" {
-  name = "${local.opensearch_collection_name}-net"
+  name = "${coalesce(var.opensearch_collection_name, "${var.agent_name}-vectors")}-net"
   type = "network"
 
   policy = jsonencode([
@@ -226,11 +219,11 @@ resource "aws_opensearchserverless_security_policy" "network" {
       Rules = [
         {
           ResourceType = "collection"
-          Resource     = ["collection/${local.opensearch_collection_name}"]
+          Resource     = ["collection/${coalesce(var.opensearch_collection_name, "${var.agent_name}-vectors")}"]
         },
         {
           ResourceType = "dashboard"
-          Resource     = ["collection/${local.opensearch_collection_name}"]
+          Resource     = ["collection/${coalesce(var.opensearch_collection_name, "${var.agent_name}-vectors")}"]
         }
       ]
       AllowFromPublic = true
@@ -239,7 +232,7 @@ resource "aws_opensearchserverless_security_policy" "network" {
 }
 
 resource "aws_opensearchserverless_access_policy" "data" {
-  name = "${local.opensearch_collection_name}-access"
+  name = "${coalesce(var.opensearch_collection_name, "${var.agent_name}-vectors")}-access"
   type = "data"
 
   policy = jsonencode([
@@ -247,7 +240,7 @@ resource "aws_opensearchserverless_access_policy" "data" {
       Rules = [
         {
           ResourceType = "index"
-          Resource     = ["index/${local.opensearch_collection_name}/*"]
+          Resource     = ["index/${coalesce(var.opensearch_collection_name, "${var.agent_name}-vectors")}/*"]
           Permission = [
             "aoss:CreateIndex",
             "aoss:DeleteIndex",
@@ -259,7 +252,7 @@ resource "aws_opensearchserverless_access_policy" "data" {
         },
         {
           ResourceType = "collection"
-          Resource     = ["collection/${local.opensearch_collection_name}"]
+          Resource     = ["collection/${coalesce(var.opensearch_collection_name, "${var.agent_name}-vectors")}"]
           Permission = [
             "aoss:CreateCollectionItems",
             "aoss:DescribeCollectionItems",
@@ -269,14 +262,14 @@ resource "aws_opensearchserverless_access_policy" "data" {
       ]
       Principal = [
         aws_iam_role.knowledge_base.arn,
-        "arn:${local.partition}:iam::${local.account_id}:root"
+        "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"
       ]
     }
   ])
 }
 
 resource "aws_opensearchserverless_collection" "this" {
-  name = local.opensearch_collection_name
+  name = coalesce(var.opensearch_collection_name, "${var.agent_name}-vectors")
   type = "VECTORSEARCH"
 
   depends_on = [
@@ -301,7 +294,7 @@ resource "aws_bedrockagent_knowledge_base" "this" {
     type = "VECTOR"
 
     vector_knowledge_base_configuration {
-      embedding_model_arn = "arn:${local.partition}:bedrock:${local.region}::foundation-model/${var.embedding_model}"
+      embedding_model_arn = "arn:${data.aws_partition.current.partition}:bedrock:${data.aws_region.current.name}::foundation-model/${var.embedding_model}"
     }
   }
 
@@ -391,7 +384,7 @@ resource "aws_iam_role_policy_attachment" "action_group_lambda_basic" {
   for_each = { for idx, ag in var.action_groups : ag.name => ag }
 
   role       = aws_iam_role.action_group_lambda[each.key].name
-  policy_arn = "arn:${local.partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_lambda_function" "action_group" {
