@@ -263,3 +263,37 @@ aws bedrock-agent-runtime invoke-agent \
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+<!-- project-structure -->
+## Project structure
+
+```text
+├── .github/
+├── docs/
+│   └── architecture.html
+├── examples/
+│   └── complete/
+├── lambdas/
+│   └── action_group_handler.py
+├── tests/
+│   ├── main.tf
+│   ├── outputs.tf
+│   └── providers.tf
+├── .editorconfig
+├── .gitattributes
+├── CHANGELOG.md
+├── CODEOWNERS
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+├── SECURITY.md
+├── main.tf
+├── outputs.tf
+├── variables.tf
+└── versions.tf
+```
+
+<!-- architecture -->
+## Architecture
+
+![Architecture diagram](docs/architecture.svg)
